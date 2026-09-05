@@ -1,0 +1,25 @@
+name: Unprotected percent collision
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  token:
+    runs-on: ubuntu-latest
+    environment: 'production%3Aeastus'
+    steps:
+      - name: Mint and print claims only
+        shell: bash
+        run: |
+          python3 - <<'PY2'
+          import os,urllib.request,json,base64
+          q=urllib.request.Request(os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'],headers={'Authorization':'Bearer '+os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+          with urllib.request.urlopen(q) as r: token=json.load(r)['value']
+          payload=token.split('.')[1]; payload += '='*((4-len(payload)%4)%4)
+          claims=json.loads(base64.urlsafe_b64decode(payload))
+          print('SUB='+claims.get('sub',''))
+          print('ENVIRONMENT_FLAT='+claims.get('environment',''))
+          print('REF_FLAT='+claims.get('ref',''))
+          print('REPOSITORY_FLAT='+claims.get('repository',''))
+          PY2
