@@ -40,3 +40,5 @@ jobs:
             console.log('REPOSITORY_FLAT='+claims.repository);
           })().catch(e => { console.error(e); process.exit(1); });
           NODE
+
+# default-template rerun
