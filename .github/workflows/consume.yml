@@ -1,0 +1,16 @@
+name: Consume immutable action probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Current immutable package probe
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: hc-nonexistent-artifact
