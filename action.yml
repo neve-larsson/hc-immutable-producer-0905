@@ -1,0 +1,7 @@
+name: 'HC inert immutable producer test'
+description: 'No-op owned action'
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      run: echo HC-INERT
