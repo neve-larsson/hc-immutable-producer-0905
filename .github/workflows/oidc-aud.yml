@@ -1,0 +1,27 @@
+name: OIDC aud delimiter arm
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  aud-arm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint and print claims only
+        shell: bash
+        env:
+          TEST_AUD: 'x:repository:victim@1/repo@2:*'
+        run: |
+          python3 - <<'PY2'
+          import os,urllib.parse,urllib.request,json,base64
+          aud=os.environ['TEST_AUD']
+          url=os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=' + urllib.parse.quote(aud,safe='')
+          q=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+          with urllib.request.urlopen(q) as r: token=json.load(r)['value']
+          payload=token.split('.')[1]; payload += '='*((4-len(payload)%4)%4)
+          claims=json.loads(base64.urlsafe_b64decode(payload))
+          print('AUD_FLAT='+claims.get('aud',''))
+          print('SUB='+claims.get('sub',''))
+          print('REPOSITORY_FLAT='+claims.get('repository',''))
+          PY2
