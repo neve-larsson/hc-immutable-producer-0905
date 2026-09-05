@@ -2,6 +2,7 @@ name: Writer percent collision
 on:
   push:
     branches: ['writer-attack']
+  workflow_dispatch:
 permissions:
   contents: read
   id-token: write
@@ -10,18 +11,32 @@ jobs:
     runs-on: ubuntu-latest
     environment: 'prod%3Awriter-gate'
     steps:
-      - name: Mint and print claims only
+      - name: Mint, verify signature, print safe metadata only
         shell: bash
         run: |
-          python3 - <<'PY2'
-          import os,urllib.request,json,base64
-          q=urllib.request.Request(os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'],headers={'Authorization':'Bearer '+os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
-          with urllib.request.urlopen(q) as r: token=json.load(r)['value']
-          payload=token.split('.')[1]; payload += '='*((4-len(payload)%4)%4)
-          claims=json.loads(base64.urlsafe_b64decode(payload))
-          print('SUB='+claims.get('sub',''))
-          print('ENVIRONMENT_FLAT='+claims.get('environment',''))
-          print('REF_FLAT='+claims.get('ref',''))
-          print('ACTOR_FLAT='+claims.get('actor',''))
-          print('REPOSITORY_FLAT='+claims.get('repository',''))
-          PY2
+          node <<'NODE'
+          const crypto = require('crypto');
+          (async () => {
+            const r = await fetch(process.env.ACTIONS_ID_TOKEN_REQUEST_URL, {headers:{Authorization:'Bearer '+process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}});
+            const token = (await r.json()).value;
+            const [h,p,s] = token.split('.');
+            const header = JSON.parse(Buffer.from(h,'base64url'));
+            const claims = JSON.parse(Buffer.from(p,'base64url'));
+            const cfg = await (await fetch('https://token.actions.githubusercontent.com/.well-known/openid-configuration')).json();
+            const jwks = await (await fetch(cfg.jwks_uri)).json();
+            const jwk = jwks.keys.find(k => k.kid === header.kid);
+            const key = crypto.createPublicKey({key:jwk, format:'jwk'});
+            const valid = crypto.verify('RSA-SHA256', Buffer.from(h+'.'+p), key, Buffer.from(s,'base64url'));
+            console.log('JWT_LEN='+token.length);
+            console.log('JWT_SHA256='+crypto.createHash('sha256').update(token).digest('hex'));
+            console.log('JWT_ALG='+header.alg);
+            console.log('JWT_KID='+header.kid);
+            console.log('SIG_VALID='+valid);
+            console.log('ISS='+claims.iss);
+            console.log('SUB='+claims.sub);
+            console.log('ENVIRONMENT_FLAT='+claims.environment);
+            console.log('REF_FLAT='+claims.ref);
+            console.log('ACTOR_FLAT='+claims.actor);
+            console.log('REPOSITORY_FLAT='+claims.repository);
+          })().catch(e => { console.error(e); process.exit(1); });
+          NODE
